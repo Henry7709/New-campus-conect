@@ -225,10 +225,18 @@ function onPop(ev){
 /* ===== my own chat background photo (saved on this phone) ===== */
 function bgKey(){return "cc-bgimg-"+S.uid}
 function getBgImg(){try{return localStorage.getItem(bgKey())}catch(e){return null}}
+function getBgOp(){var v=70;try{var x=parseInt(localStorage.getItem("cc-bgop-"+S.uid),10);if(x>=10&&x<=100)v=x}catch(e){}return v}
+function setBgOp(v){try{localStorage.setItem("cc-bgop-"+S.uid,String(v))}catch(e){}}
+function bgSlider(){
+  var lab=h("div",{class:"sub",text:"Background opacity: "+getBgOp()+"%"});
+  var r=h("input",{type:"range",min:"10",max:"100",step:"5",value:String(getBgOp()),"aria-label":"Background opacity",style:"width:100%"});
+  r.addEventListener("input",function(){setBgOp(+r.value);lab.textContent="Background opacity: "+r.value+"%";applyChatBg($("#msgs"))});
+  return h("div",{style:"display:flex;flex-direction:column;gap:4px;margin-top:6px"},lab,r)
+}
 function setBgImg(v){try{if(v)localStorage.setItem(bgKey(),v);else localStorage.removeItem(bgKey())}catch(e){}}
 function applyChatBg(el){
   if(!el)return;var im=getBgImg();
-  if(im){el.setAttribute("data-bg","image");el.style.backgroundImage="linear-gradient(rgba(0,0,0,.22),rgba(0,0,0,.22)),url('"+im+"')"}
+  if(im){var ov=100-getBgOp(),cv="color-mix(in srgb,var(--chat) "+ov+"%,transparent)";el.setAttribute("data-bg","image");el.style.backgroundImage="linear-gradient("+cv+","+cv+"),url('"+im+"')"}
   else{el.style.backgroundImage="";el.setAttribute("data-bg",(S.me&&S.me.chat_bg)||"plain")}
 }
 function pickBgPhoto(){
@@ -252,6 +260,7 @@ function pickBgPhoto(){
 function quickBg(){
   var b=h("div",{style:"display:flex;flex-direction:column;gap:8px"},
     h("button",{class:"btn",onclick:function(){pickBgPhoto().then(function(ok){if(ok){applyChatBg($("#msgs"));closeSheet()}}).catch(fail)}},"Choose a photo"),
+    getBgImg()?bgSlider():null,
     getBgImg()?h("button",{class:"btn ghost",onclick:function(){setBgImg(null);applyChatBg($("#msgs"));closeSheet()}},"Remove my photo"):null,
     h("div",{class:"sub",text:"Saved on this phone and used in all your chats."}));
   openSheet("Chat background",b);
@@ -300,10 +309,18 @@ function showAuth(){
   var pass=h("input",{class:"field",id:"pw",type:"password",autocomplete:"current-password",placeholder:"Password (6+ characters)"});
   var name=h("input",{class:"field",id:"nm",placeholder:"Your name",hidden:true});
   var err=h("div",{class:"err"});
+  var camp=h("select",{class:"field",id:"campsel",hidden:true,"aria-label":"Your campus"},h("option",{value:"",text:"Choose your campus"}));
+  S.sb.from("campuses").select("*").order("name").then(function(r){
+    if(r.error||!r.data||!r.data.length)return;
+    r.data.forEach(function(c){camp.append(h("option",{value:c.id,text:c.name}))});
+    camp.hidden=mode==="in"});
   var go=h("button",{class:"btn",onclick:submit},"Sign in");
-  var sw=h("button",{class:"chip",onclick:function(){mode=mode==="in"?"up":"in";name.hidden=mode==="in";go.textContent=mode==="in"?"Sign in":"Create account";sw.textContent=mode==="in"?"New here? Create an account":"Have an account? Sign in";err.textContent=""}},"New here? Create an account");
+  var sw=h("button",{class:"chip",onclick:function(){mode=mode==="in"?"up":"in";name.hidden=mode==="in";camp.hidden=mode==="in"||camp.options.length<2;go.textContent=mode==="in"?"Sign in":"Create account";sw.textContent=mode==="in"?"New here? Create an account":"Have an account? Sign in";err.textContent=""}},"New here? Create an account");
   function submit(){
     err.textContent="";var e=email.value.trim(),p=pass.value;if(!e||p.length<6){err.textContent="Enter your email and a password of at least 6 characters.";return}
+    if(mode==="up"){
+      if(camp.options.length>1&&!camp.value){err.textContent="Choose your campus.";return}
+      try{localStorage.setItem("cc-pending-campus",camp.value||"")}catch(x){}}
     go.disabled=true;
     var call=mode==="in"?S.sb.auth.signInWithPassword({email:e,password:p}):S.sb.auth.signUp({email:e,password:p,options:{data:{name:name.value.trim()}}});
     call.then(function(r){go.disabled=false;
@@ -312,7 +329,7 @@ function showAuth(){
     });
   }
   pass.addEventListener("keydown",function(ev){if(ev.key==="Enter")submit()});
-  app.append(h("div",{id:"auth"},h("img",{src:"icon.svg",class:"logo",alt:"",style:"width:64px;height:64px;border-radius:18px"}),h("h1",{text:"Campus Connect"}),h("p",{text:"Chat, share and study with people on your campus."}),name,email,pass,err,go,sw));
+  app.append(h("div",{id:"auth"},h("img",{src:"icon.svg",class:"logo",alt:"",style:"width:64px;height:64px;border-radius:18px"}),h("h1",{text:"Campus Connect"}),h("p",{text:"Chat, share and study with people on your campus."}),name,camp,email,pass,err,go,sw));
 }
 
 /* ===== data ===== */
@@ -585,7 +602,7 @@ function renderProfile(){
   var save=h("button",{class:"btn",onclick:function(){var n=name.value.trim();if(!n){name.focus();toast("Add your name first.");return}save.disabled=true;
     S.sb.from("profiles").update({name:n,about:about.value.trim(),status:status.value.trim(),avatar_url:draft.avatar,campus_id:camp.value,accent:draft.accent,chat_bg:draft.bg}).eq("id",S.uid).then(function(r){q(r);toast("Profile saved");return loadCore().then(function(){S.cid=camp.value;return loadCampusData()})}).catch(fail).then(function(){save.disabled=false})}},"Save profile");
   v.append(av,h("div",{class:"form"},change,h("label",{for:"pname",text:"Name"}),name,h("label",{for:"pabout",text:"About"}),about,h("label",{for:"pstatus",text:"Status"}),status,quick,
-    h("label",{for:"pcampus",text:"Campus"}),camp,h("label",{text:"Accent colour"}),sw,h("label",{text:"Chat background"}),bgs,h("div",{class:"choices",style:"margin-top:8px"},h("button",{class:"chip",onclick:function(){pickBgPhoto().then(function(ok){if(ok)toast("Background photo set")}).catch(fail)}},"Use my own photo"),h("button",{class:"chip",onclick:function(){setBgImg(null);toast("Photo removed")}},"Remove photo")),h("label",{text:"Notifications"}),h("button",{class:"chip",style:"align-self:flex-start",onclick:askNotify},canNotify()?(Notification.permission==="granted"?"Notifications are on":"Turn on notifications"):"Not supported on this browser"),h("label",{text:"Appearance"}),modes,h("div",{style:"height:10px"}),save,
+    h("label",{for:"pcampus",text:"Campus"}),camp,h("label",{text:"Accent colour"}),sw,h("label",{text:"Chat background"}),bgs,h("div",{class:"choices",style:"margin-top:8px"},h("button",{class:"chip",onclick:function(){pickBgPhoto().then(function(ok){if(ok)toast("Background photo set")}).catch(fail)}},"Use my own photo"),h("button",{class:"chip",onclick:function(){setBgImg(null);toast("Photo removed")}},"Remove photo")),bgSlider(),h("label",{text:"Notifications"}),h("button",{class:"chip",style:"align-self:flex-start",onclick:askNotify},canNotify()?(Notification.permission==="granted"?"Notifications are on":"Turn on notifications"):"Not supported on this browser"),h("label",{text:"Appearance"}),modes,h("div",{style:"height:10px"}),save,
     m.is_admin?h("button",{class:"btn ghost",onclick:adminSheet},"Admin panel"):null,
     h("button",{class:"btn danger",onclick:function(){S.sb.auth.signOut()}},"Sign out")));
 }
@@ -614,11 +631,29 @@ function adminSheet(){
   draw();openSheet("Admin panel",body);
 }
 
+/* ===== campus choice for new accounts ===== */
+function saveCampus(id){
+  return S.sb.from("profiles").update({campus_id:id}).eq("id",S.uid).then(function(r){
+    q(r);try{localStorage.removeItem("cc-pending-campus")}catch(e){}return loadCore()})
+}
+function ensureCampus(){
+  if(S.me.campus_id||!S.campuses.length)return Promise.resolve();
+  var pend="";try{pend=localStorage.getItem("cc-pending-campus")||""}catch(e){}
+  if(pend&&S.campuses.some(function(c){return c.id===pend}))return saveCampus(pend);
+  if(S.campuses.length<2)return saveCampus(S.campuses[0].id);
+  return new Promise(function(res){
+    var app=$("#app");app.textContent="";var list=h("div",{});
+    S.campuses.forEach(function(c){
+      list.append(h("button",{class:"row",onclick:function(){saveCampus(c.id).then(res).catch(fail)}},
+        h("div",{class:"grow"},h("div",{class:"name",text:c.name}),h("div",{class:"sub",text:c.short||""}))))});
+    app.append(h("div",{id:"auth"},h("h1",{text:"Choose your campus"}),h("p",{text:"You will see chats, events and posts from your campus."}),list))})
+}
+
 /* ===== boot ===== */
 function start(session){
   if(!session){S.uid=null;S.me=null;if(S.chan){S.sb.removeChannel(S.chan);S.chan=null}showAuth();return}
   S.uid=session.user.id;
-  loadCore().then(function(){buildShell();setTab("home");return loadCampusData()}).then(subscribe).catch(function(e){
+  loadCore().then(ensureCampus).then(function(){buildShell();setTab("home");return loadCampusData()}).then(subscribe).catch(function(e){
     $("#app").textContent="";$("#app").append(h("div",{id:"auth"},h("h1",{text:"Couldn't start"}),h("p",{text:navigator.onLine?((e&&e.message)||"Reload the page to try again."):"You are offline. Connect to the internet and the app will reload by itself."}),h("button",{class:"btn",onclick:function(){location.reload()}},"Reload")))});
 }
 function boot(){
