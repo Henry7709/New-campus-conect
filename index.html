@@ -118,6 +118,14 @@ textarea.field{resize:vertical;min-height:70px}
 .swatch[aria-checked="true"]{outline-color:var(--fg)}
 .date{width:48px;text-align:center;border-radius:12px;background:var(--surface2);padding:6px 0;flex:none}
 .date b{display:block;font-size:20px;line-height:1.1}.date span{font-size:11px;font-weight:700;text-transform:uppercase;color:var(--accent)}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.item{display:flex;flex-direction:column;gap:3px;text-align:left;min-width:0}
+.item .pic{position:relative;aspect-ratio:1/1;border-radius:14px;overflow:hidden;background:var(--surface2)}
+.item .pic img{width:100%;height:100%;object-fit:cover;display:block}
+.item .ph{width:100%;height:100%;display:grid;place-items:center;color:var(--muted)}
+.item .ph .icon{width:40px;height:40px}
+.item .price{font-weight:800;color:var(--accent);margin-top:4px}
+.soldtag{position:absolute;top:8px;left:8px;background:var(--danger);color:#fff;font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px}
 /* sheet */
 #sheetwrap{position:absolute;inset:0;background:rgba(0,0,0,.45);z-index:40;display:flex;align-items:flex-end;justify-content:center}
 .sheet{background:var(--bg);width:100%;max-height:90%;border-radius:20px 20px 0 0;padding:14px 16px calc(18px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:10px;overflow:hidden}
@@ -167,12 +175,12 @@ var ICONS={send:"M22 2 11 13M22 2l-7 20-4-9-9-4z",clip:"M21 12.5l-8.5 8.5a5.5 5.
  back:"M15 5l-7 7 7 7",home:"M4 11l8-7 8 7v9h-5v-6H9v6H4z",chat:"M4 5h16v11H9l-5 4z",study:"M3 8l9-4 9 4-9 4zM7 10.5V15c0 1.5 2.2 3 5 3s5-1.500 5-3v-4.500",
  cal:"M4 6h16v14H4zM4 10h16M8 3v4M16 3v4",user:"M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0",
  heart:"M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z",comment:"M4 5h16v11H9l-5 4z",plus:"M12 5v14M5 12h14",x:"M6 6l12 12M18 6L6 18",
- trash:"M5 7h14M9 7V4h6v3M7 7l1 13h8l1-13",people:"M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2 20a7 7 0 0 1 14 0M17 5a3 3 0 0 1 0 6M18 14a6 6 0 0 1 4 6",file:"M7 3h7l5 5v13H7zM14 3v5h5",image:"M4 5h16v14H4zM4 16l5-5 4 4 3-3 4 4M9 9h.01"};
+ trash:"M5 7h14M9 7V4h6v3M7 7l1 13h8l1-13",people:"M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2 20a7 7 0 0 1 14 0M17 5a3 3 0 0 1 0 6M18 14a6 6 0 0 1 4 6",file:"M7 3h7l5 5v13H7zM14 3v5h5",image:"M4 5h16v14H4zM4 16l5-5 4 4 3-3 4 4M9 9h.01",bag:"M5 8h14l-1 12H6zM9 8V6a3 3 0 0 1 6 0v2"};
 function icon(n){var s=document.createElementNS("http://www.w3.org/2000/svg","svg");s.setAttribute("viewBox","0 0 24 24");s.setAttribute("class","icon");s.setAttribute("aria-hidden","true");
   var p=document.createElementNS("http://www.w3.org/2000/svg","path");p.setAttribute("d",ICONS[n]);s.appendChild(p);return s}
 
 var S={sb:null,uid:null,me:null,campuses:[],cid:null,profiles:{},settings:{},tab:"home",room:null,msgs:[],replyTo:null,chan:null,
-  rooms:[],dms:[],posts:[],likes:{},stories:[],study:[],events:[],read:{},ff:"all"};
+  rooms:[],dms:[],posts:[],likes:{},stories:[],study:[],items:[],mf:"all",mq:"",read:{},ff:"all"};
 try{S.read=JSON.parse(localStorage.getItem("cc-read")||"{}")}catch(e){}
 function markRead(k){S.read[k]=Date.now();try{localStorage.setItem("cc-read",JSON.stringify(S.read))}catch(e){}}
 
@@ -350,10 +358,10 @@ function loadCampusData(){
     S.sb.from("posts").select("*").eq("campus_id",c).order("created_at",{ascending:false}).limit(60),
     S.sb.from("stories").select("*").eq("campus_id",c).gte("created_at",since).order("created_at"),
     S.sb.from("study_items").select("*").eq("campus_id",c).order("created_at",{ascending:false}).limit(100),
-    S.sb.from("events").select("*").eq("campus_id",c).gte("starts_at",new Date(Date.now()-864e5).toISOString()).order("starts_at"),
+    S.sb.from("listings").select("*").eq("campus_id",c).order("created_at",{ascending:false}).limit(100),
     S.sb.from("messages").select("*").not("dm_to","is",null).order("created_at",{ascending:false}).limit(300)
   ]).then(function(r){
-    S.rooms=q(r[0]);S.posts=q(r[1]);S.stories=q(r[2]);S.study=q(r[3]);S.events=q(r[4]);
+    S.rooms=q(r[0]);S.posts=q(r[1]);S.stories=q(r[2]);S.study=q(r[3]);S.items=r[4].error?[]:(r[4].data||[]);
     var seen={};S.dms=[];q(r[5]).forEach(function(m){var o=m.sender===S.uid?m.dm_to:m.sender;if(!seen[o]){seen[o]=1;S.dms.push({other:o,last:m})}});
     var ids=S.posts.map(function(p){return p.id});
     return ids.length?S.sb.from("post_likes").select("*").in("post_id",ids):{data:[]};
@@ -380,15 +388,15 @@ function buildShell(){
   var sel=h("select",{"aria-label":"Campus",id:"campussel",onchange:function(){S.cid=sel.value;loadCampusData().catch(fail)}});
   app.append(h("div",{class:"top"},h("img",{src:"icon.svg",class:"logo",alt:""}),h("div",{class:"brand"},"Campus Connect",sel),
     h("button",{class:"iconbtn","aria-label":"Find people",onclick:peopleSheet},icon("people"))),
-    h("div",{class:"views"},["home","chat","study","events","profile"].map(function(k){return h("section",{class:"view",id:"v-"+k,hidden:k!=="home"})})),
-    h("nav",{class:"tabs",role:"tablist"},[["home","Home","home"],["chat","Chat","chat"],["study","Study","study"],["events","Events","cal"],["profile","Profile","user"]].map(function(t){
+    h("div",{class:"views"},["home","chat","study","market","profile"].map(function(k){return h("section",{class:"view",id:"v-"+k,hidden:k!=="home"})})),
+    h("nav",{class:"tabs",role:"tablist"},[["home","Home","home"],["chat","Chat","chat"],["study","Study","study"],["market","Market","bag"],["profile","Profile","user"]].map(function(t){
       return h("button",{class:"tab",role:"tab","data-v":t[0],"aria-selected":String(t[0]==="home"),onclick:function(){setTab(t[0])}},icon(t[2]),t[1])})));
 }
-function setTab(t){S.tab=t;["home","chat","study","events","profile"].forEach(function(k){$("#v-"+k).hidden=k!==t});
+function setTab(t){S.tab=t;["home","chat","study","market","profile"].forEach(function(k){$("#v-"+k).hidden=k!==t});
   document.querySelectorAll(".tab").forEach(function(b){b.setAttribute("aria-selected",String(b.dataset.v===t))});render()}
 function render(){
   var sel=$("#campussel");if(sel){sel.textContent="";S.campuses.forEach(function(c){sel.append(h("option",{value:c.id,selected:c.id===S.cid},c.name))})}
-  if(S.tab==="home")renderHome();if(S.tab==="chat")renderChat();if(S.tab==="study")renderStudy();if(S.tab==="events")renderEvents();if(S.tab==="profile")renderProfile();
+  if(S.tab==="home")renderHome();if(S.tab==="chat")renderChat();if(S.tab==="study")renderStudy();if(S.tab==="market")renderMarket();if(S.tab==="profile")renderProfile();
   if(S.room)renderMsgs(false);
 }
 
@@ -568,21 +576,68 @@ function newStudySheet(){
   openSheet("Share study notes",[course,title,link,pick,info],go);
 }
 
-/* ===== events ===== */
-function renderEvents(){
-  var v=$("#v-events");v.textContent="";
-  v.append(h("div",{class:"label"},"Upcoming events",h("button",{class:"chip",onclick:newEventSheet},"Add event")));
-  if(!S.events.length)v.append(h("div",{class:"empty",text:"No events yet. Add a lecture, club meeting or party."}));
-  S.events.forEach(function(e){var d=new Date(e.starts_at);
-    v.append(h("div",{class:"row"},h("div",{class:"date"},h("b",{text:String(d.getDate())}),h("span",{text:d.toLocaleDateString([], {month:"short"})})),
-      h("div",{class:"grow"},h("div",{class:"name",text:e.title}),h("div",{class:"sub",text:fmtTime(e.starts_at)+(e.location?" · "+e.location:"")}),e.descr?h("div",{class:"sub",text:e.descr}):null),
-      (e.author===S.uid||S.me.is_admin)?h("button",{class:"iconbtn","aria-label":"Delete event",onclick:function(){S.sb.from("events").delete().eq("id",e.id).then(function(){loadCampusData()})}},icon("trash")):null))});
+/* ===== market ===== */
+var CATS=["Electronics","Books","Clothes","Food","Services","Other"];
+function money(p){return "UGX "+Math.round(Number(p)||0).toLocaleString()}
+function waLink(num){var d=String(num||"").replace(/\D/g,"");if(!d)return null;if(d.charAt(0)==="0")d="256"+d.slice(1);return "https://wa.me/"+d}
+function renderMarket(){
+  var v=$("#v-market");v.textContent="";
+  var box=h("input",{class:"field",type:"search",id:"mq",placeholder:"Search the market","aria-label":"Search the market",value:S.mq||""});
+  var chips=h("div",{class:"choices",style:"margin:10px 0"});
+  var grid=h("div",{class:"grid"});
+  function draw(){
+    grid.textContent="";
+    var t=(S.mq||"").trim().toLowerCase();
+    var list=S.items.filter(function(it){return (S.mf==="all"||it.category===S.mf)&&(!t||(it.title||"").toLowerCase().indexOf(t)>=0)});
+    if(!list.length){grid.append(h("div",{class:"empty",style:"grid-column:1/-1",text:S.items.length?"Nothing matches your search.":"Nothing for sale yet. Tap Sell something to post the first item."}));return}
+    list.forEach(function(it){
+      var pic=it.image_url?h("img",{src:it.image_url,alt:"",loading:"lazy"}):h("div",{class:"ph"},icon("bag"));
+      grid.append(h("button",{class:"item",onclick:function(){listingSheet(it)}},
+        h("div",{class:"pic"},pic,it.sold?h("span",{class:"soldtag",text:"SOLD"}):null),
+        h("div",{class:"price",text:money(it.price)}),
+        h("div",{class:"name",text:it.title}),
+        h("div",{class:"sub clip",text:prof(it.seller).name+" · "+ago(it.created_at)})))})}
+  ["all"].concat(CATS).forEach(function(c){
+    chips.append(h("button",{class:"chip","aria-checked":String(S.mf===c),"data-c":c,onclick:function(){
+      S.mf=c;chips.querySelectorAll(".chip").forEach(function(x){x.setAttribute("aria-checked",String(x.dataset.c===c))});draw()}},c==="all"?"All":c))});
+  box.addEventListener("input",function(){S.mq=box.value;draw()});
+  v.append(h("div",{class:"label"},"Campus market",h("button",{class:"chip",onclick:newListingSheet},"Sell something")),box,chips,grid);
+  draw();
 }
-function newEventSheet(){
-  var title=h("input",{class:"field",id:"et",maxlength:"80",placeholder:"Event title"}),when=h("input",{class:"field",id:"ew",type:"datetime-local"}),loc=h("input",{class:"field",id:"el",maxlength:"80",placeholder:"Where?"}),desc=h("input",{class:"field",id:"ed",maxlength:"160",placeholder:"Details (optional)"});
-  var go=h("button",{class:"btn",onclick:function(){if(!title.value.trim()||!when.value){toast("Add a title and a date.");return}go.disabled=true;
-    S.sb.from("events").insert({campus_id:S.cid,author:S.uid,title:title.value.trim(),descr:desc.value.trim(),location:loc.value.trim(),starts_at:new Date(when.value).toISOString()}).then(function(r){q(r);closeSheet();loadCampusData()}).catch(function(e){go.disabled=false;fail(e)})}},"Add event");
-  openSheet("New event",[title,when,loc,desc],go);
+function listingSheet(it){
+  var mine=it.seller===S.uid,can=mine||S.me.is_admin,wa=waLink(it.contact),body=[];
+  if(it.image_url)body.push(h("img",{src:it.image_url,alt:"",style:"width:100%;max-height:340px;object-fit:cover;border-radius:14px"}));
+  body.push(h("div",{style:"font-size:22px;font-weight:800"},money(it.price),it.sold?h("span",{class:"tag",style:"margin-left:10px",text:"Sold"}):null));
+  body.push(h("div",{class:"name",style:"white-space:normal;font-size:17px",text:it.title}));
+  body.push(h("div",{class:"sub",text:(it.category||"Other")+" · "+ago(it.created_at)}));
+  if(it.descr)body.push(h("div",{style:"white-space:pre-wrap;overflow-wrap:anywhere",text:it.descr}));
+  body.push(h("button",{class:"row",onclick:function(){closeSheet();profileSheet(it.seller)}},avatar(it.seller,"sm"),
+    h("div",{class:"grow"},h("div",{class:"name",text:prof(it.seller).name}),h("div",{class:"sub",text:"Seller"}))));
+  var acts=h("div",{style:"display:flex;gap:8px;flex-wrap:wrap"});
+  if(!mine)acts.append(h("button",{class:"btn",onclick:function(){closeSheet();openDM(it.seller)}},"Message seller"));
+  if(wa)acts.append(h("a",{class:"btn ghost",href:wa,target:"_blank",rel:"noopener",style:"text-decoration:none"},"WhatsApp"));
+  if(can){
+    acts.append(h("button",{class:"btn ghost",onclick:function(){S.sb.from("listings").update({sold:!it.sold}).eq("id",it.id).then(function(r){q(r);closeSheet();return loadCampusData()}).catch(fail)}},it.sold?"Mark available":"Mark as sold"));
+    acts.append(h("button",{class:"btn danger",onclick:function(){S.sb.from("listings").delete().eq("id",it.id).then(function(r){q(r);closeSheet();return loadCampusData()}).catch(fail)}},"Delete"))}
+  body.push(acts);
+  openSheet(it.title,body);
+}
+function newListingSheet(){
+  var title=h("input",{class:"field",id:"lt",maxlength:"80",placeholder:"What are you selling?"});
+  var price=h("input",{class:"field",id:"lp",type:"number",inputmode:"numeric",min:"0",placeholder:"Price in UGX"});
+  var cat=h("select",{class:"field",id:"lc","aria-label":"Category"},CATS.map(function(c){return h("option",{value:c,text:c})}));
+  var desc=h("textarea",{class:"field",id:"ld",maxlength:"400",placeholder:"Describe it (condition, size, where to meet)"});
+  var phone=h("input",{class:"field",id:"lw",type:"tel",maxlength:"20",placeholder:"WhatsApp number (optional)"});
+  var file=null,info=h("div",{class:"sub",text:"Add a clear photo. Items with photos sell faster."});
+  var pick=h("button",{class:"btn ghost",onclick:function(){pickFile("image/*").then(function(f){if(f){file=f;info.textContent="Selected: "+f.name}})}},"Add photo");
+  var go=h("button",{class:"btn",onclick:function(){
+    var t=title.value.trim();if(!t){title.focus();return}
+    var p=parseFloat(price.value);if(isNaN(p)||p<0){toast("Enter a price.");price.focus();return}
+    go.disabled=true;
+    (file?upload(file):Promise.resolve(null)).then(function(u){
+      return S.sb.from("listings").insert({campus_id:S.cid,seller:S.uid,title:t,price:p,category:cat.value,descr:desc.value.trim(),contact:phone.value.trim()||null,image_url:u&&u.url})})
+    .then(function(r){q(r);closeSheet();toast("Item posted");return loadCampusData()}).catch(function(e){go.disabled=false;fail(e)})}},"Post item");
+  openSheet("Sell something",[title,price,cat,desc,phone,pick,info],go);
 }
 
 /* ===== profile + admin ===== */
