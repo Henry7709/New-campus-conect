@@ -131,12 +131,18 @@ textarea.field{resize:vertical;min-height:70px}
 .recdot{width:10px;height:10px;border-radius:50%;background:var(--danger);animation:pulse 1s infinite}
 @keyframes pulse{50%{opacity:.25}}
 #homebg{position:absolute;inset:0;z-index:0;overflow:hidden;pointer-events:none;background:var(--bg)}
-#homebg .slide{position:absolute;inset:0;background-size:cover;background-position:center;opacity:0}
+#homebg .slide{position:absolute;inset:0;overflow:hidden;opacity:0}
+#homebg .slide::before{content:"";position:absolute;inset:-24px;background:var(--bgimg) center/cover no-repeat;filter:blur(22px)}
+#homebg .slide::after{content:"";position:absolute;inset:0;background:var(--bgimg) center/contain no-repeat}
 #homebg::after{content:"";position:absolute;inset:0;background:linear-gradient(transparent 55%,color-mix(in srgb,var(--bg) 14%,transparent))}
 #v-home{z-index:1}
 #v-home .story span:last-child{background:color-mix(in srgb,var(--surface) 86%,transparent);color:var(--fg);padding:1px 8px;border-radius:999px;max-width:72px}
 #v-home .empty{background:color-mix(in srgb,var(--surface) 86%,transparent);border-radius:16px;padding:16px 14px;margin-top:6px}
 #v-home .post{box-shadow:0 2px 12px rgba(0,0,0,.18)}
+#updbox{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.6);display:grid;place-items:center;padding:24px}
+.updcard{background:var(--surface);color:var(--fg);border-radius:22px;padding:24px 22px;max-width:340px;width:100%;display:flex;flex-direction:column;gap:12px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.4)}
+.updcard h2{margin:0;font-size:20px}
+.updcard p{margin:0;color:var(--muted);line-height:1.45}
 /* sheet */
 #sheetwrap{position:absolute;inset:0;background:rgba(0,0,0,.45);z-index:40;display:flex;align-items:flex-end;justify-content:center}
 .sheet{background:var(--bg);width:100%;max-height:90%;border-radius:20px 20px 0 0;padding:14px 16px calc(18px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:10px;overflow:hidden}
@@ -272,7 +278,7 @@ function nextHomeBg(){
   homeIdx=(homeIdx+1)%HOME_PICS.length;
   var front=sl[homeFront],back=sl[1-homeFront];
   back.style.transition="none";back.style.opacity="0";back.style.zIndex="2";front.style.zIndex="1";
-  back.style.backgroundImage="url('"+HOME_PICS[homeIdx]+"')";
+  back.style.setProperty("--bgimg","url('"+HOME_PICS[homeIdx]+"')");
   void back.offsetWidth;
   if(first||still){back.style.opacity="1";front.style.opacity="0"}
   else{back.style.transition="opacity 1.2s ease";back.style.opacity="1";setTimeout(function(){front.style.transition="none";front.style.opacity="0"},1300)}
@@ -856,7 +862,27 @@ function boot(){
       if(ev==="SIGNED_IN"&&!first&&S.uid===(session&&session.user.id))return;
       first=false;setTimeout(function(){start(session)},0)}
   });
-  if("serviceWorker" in navigator)window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){})});
+  var updating=false,snoozeUntil=0;
+  function showUpdate(w){
+    if(document.getElementById("updbox")||Date.now()<snoozeUntil)return;
+    var box=h("div",{id:"updbox",role:"dialog","aria-modal":"true","aria-label":"Update available"},
+      h("div",{class:"updcard"},h("h2",{text:"Update available"}),
+        h("p",{text:"A new version of Campus Connect is ready. Update now to get the latest features and fixes. The app will restart."}),
+        h("button",{class:"btn",onclick:function(e){updating=true;e.currentTarget.disabled=true;e.currentTarget.textContent="Updating...";try{w.postMessage({type:"SKIP_WAITING"})}catch(x){}setTimeout(function(){location.reload()},4000)}},"Update now"),
+        h("button",{class:"btn ghost",onclick:function(){snoozeUntil=Date.now()+2*3600*1000;box.remove()}},"Later")));
+    document.body.append(box);
+  }
+  if("serviceWorker" in navigator)window.addEventListener("load",function(){
+    navigator.serviceWorker.register("sw.js").then(function(reg){
+      function offer(w){if(w&&navigator.serviceWorker.controller)showUpdate(w)}
+      if(reg.waiting)offer(reg.waiting);
+      reg.addEventListener("updatefound",function(){var w=reg.installing;if(!w)return;w.addEventListener("statechange",function(){if(w.state==="installed")offer(w)})});
+      function check(){reg.update().then(function(){if(reg.waiting)offer(reg.waiting)}).catch(function(){})}
+      setInterval(check,30*60*1000);
+      document.addEventListener("visibilitychange",function(){if(!document.hidden)check()});
+    }).catch(function(){});
+    navigator.serviceWorker.addEventListener("controllerchange",function(){if(updating)location.reload()});
+  });
 }
 boot();
 })();

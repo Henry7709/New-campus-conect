@@ -1,5 +1,5 @@
 /* Campus Connect service worker: offline app shell + notification clicks */
-const VERSION = "campus-connect-v5";
+const VERSION = "campus-connect-v6";
 const CDN = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon.svg", "./icon-192.png", CDN];
 
@@ -10,7 +10,11 @@ self.addEventListener("install", (event) => {
       Promise.allSettled(SHELL.map((u) => cache.add(new Request(u, { cache: "reload" }))))
     )
   );
-  self.skipWaiting();
+});
+
+// the app asks the user first, then sends this message
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "SKIP_WAITING") self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
