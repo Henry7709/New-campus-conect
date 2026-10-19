@@ -1,7 +1,7 @@
 /* Campus Connect service worker: offline app shell + notification clicks */
-const VERSION = "campus-connect-v3";
+const VERSION = "campus-connect-v4";
 const CDN = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js";
-const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon.svg", "./icon-192.png", "./home1.jpg", "./home2.jpg", "./home3.jpg", "./home4.jpg", CDN];
+const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon.svg", "./icon-192.png", CDN];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
