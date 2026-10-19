@@ -1,5 +1,5 @@
 /* Campus Connect service worker: offline app shell + notification clicks */
-const VERSION = "campus-connect-v6";
+const VERSION = "campus-connect-v7";
 const CDN = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon.svg", "./icon-192.png", CDN];
 
